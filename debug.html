@@ -1,0 +1,57 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DEBUG</title>
+<style>
+ body{font-family:monospace;background:#111;color:#0f0;padding:14px;font-size:13px}
+ pre{white-space:pre-wrap;word-break:break-all}
+ .r{color:#f55}
+ .g{color:#5f5}
+</style>
+<pre id="out">chal raha hai...</pre>
+<script src="config.js"></script>
+<script>
+const out = document.getElementById('out');
+out.textContent = '';
+function log(s, cls){
+  const d = document.createElement('div');
+  if (cls) d.className = cls;
+  d.textContent = s;
+  out.appendChild(d);
+}
+
+(async () => {
+  log('1) config.js load hua? ' + (typeof CFG !== 'undefined' ? 'HAAN' : 'NAHI'), typeof CFG !== 'undefined' ? 'g' : 'r');
+  if (typeof CFG === 'undefined'){ log('=> config.js 404 hai ya naam galat hai. Ruk.'); return; }
+
+  const t = (CFG.BOT_TOKEN || '').trim();
+  const c = (CFG.CHAT_ID || '').trim();
+
+  log('2) token length: ' + t.length + ' (45-50 hona chahiye)', t.length > 40 ? 'g' : 'r');
+  log('3) token me space: ' + (t !== CFG.BOT_TOKEN ? 'HAI - hatao' : 'nahi'));
+  log('4) chat_id: ' + JSON.stringify(c), c ? 'g' : 'r');
+
+  if (!t || !c){ log('=> token ya chat_id khali hai. config.js theek karo.'); return; }
+
+  log('5) getMe call...');
+  try {
+    const r = await fetch('https://api.telegram.org/bot' + t + '/getMe');
+    const j = await r.json();
+    log('   status ' + r.status + ' -> ' + JSON.stringify(j), j.ok ? 'g' : 'r');
+    if (!j.ok){ log('=> TOKEN GALAT. BotFather se naya le.'); return; }
+  } catch(e){ log('   fetch fail: ' + e.message, 'r'); return; }
+
+  log('6) sendMessage test...');
+  try {
+    const body = new URLSearchParams({ chat_id: c, text: 'TEST from debug page', parse_mode:'HTML' });
+    const r = await fetch('https://api.telegram.org/bot' + t + '/sendMessage', { method:'POST', body });
+    const j = await r.json();
+    log('   status ' + r.status + ' -> ' + JSON.stringify(j), j.ok ? 'g' : 'r');
+    if (j.ok) log('=> SAB THEEK. Bot pe message dekho.');
+    else {
+      if (j.description.includes('chat not found')) log('=> CHAT_ID GALAT, ya bot ko /start nahi kiya');
+      if (j.description.includes('Unauthorized')) log('=> TOKEN GALAT');
+    }
+  } catch(e){ log('   fetch fail: ' + e.message, 'r'); }
+})();
+</script>
